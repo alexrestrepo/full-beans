@@ -4,12 +4,20 @@ SOURCES := main.c renderer.c microui.c
 OBJECTS := $(SOURCES:%.c=%.o)
 DEPS := $(SOURCES:%.c=%.d)
 CFLAGS += -MMD
+TARGET = native
+MAIN = main
 
-main: $(OBJECTS)
+$(MAIN): $(OBJECTS)
+	$(CC) -o $(MAIN) $(OBJECTS) $(LDLIBS)
 
 -include $(DEPS)
 
 ifeq ($(OS),Windows_NT)
+	MAIN = main.exe
+	LDLIBS += -lgdi32
+else ifeq ($(TARGET), mingw)
+	MAIN = main.exe
+	export CC = x86_64-w64-mingw32-gcc
 	LDLIBS += -lgdi32
 else
 	UNAME_S := $(shell uname -s)
