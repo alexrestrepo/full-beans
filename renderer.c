@@ -1,6 +1,7 @@
-#include "fenster.h"
 #include <assert.h>
 #include <stdbool.h>
+#include <string.h>
+
 #include "renderer.h"
 #include "atlas.h"
 
@@ -11,21 +12,23 @@ typedef uint8_t byte;
 static mu_Rect tex_buf[BUFFER_SIZE];
 static mu_Rect src_buf[BUFFER_SIZE];
 static mu_Color color_buf[BUFFER_SIZE];
-
 static int buf_idx;
 
-static struct fenster window = {.title="A window", .width=800, .height=600};
+typedef struct {
+  r_renderbuffer renderbuffer;
+  mu_Rect clip_rect;
+} r_framebuffer;
 
-static mu_Rect clip_rect;
+static r_framebuffer _framebuffer = {};
 
-void r_init(void) {
-  /* init SDL window */
-  window.buf = malloc(window.width * window.height * sizeof(*window.buf));
+#define pixel(f, x, y) ((f)->renderbuffer.data[((y) * (f)->renderbuffer.width) + (x)])
+
+void r_init(r_renderbuffer rb) {
+  // init framebuffer
+  memcpy(&_framebuffer.renderbuffer, &rb, sizeof(rb));
+  _framebuffer.clip_rect = mu_rect(0, 0, rb.width, rb.height);
+
   r_clear(mu_color(0, 0, 0, 255));
-  fenster_open(&window);
-
-  /* init texture */
-  clip_rect = mu_rect(0, 0, window.width, window.height);
 }
 
 static inline bool within(int c, int lo, int hi) {
@@ -34,7 +37,7 @@ static inline bool within(int c, int lo, int hi) {
 
 static inline bool within_rect(mu_Rect rect, int x, int y) {
   return within(x, rect.x, rect.x+rect.w)
-        && within(y, rect.y, rect.y+rect.h);
+  && within(y, rect.y, rect.y+rect.h);
 }
 
 static inline bool same_size(const mu_Rect* a, const mu_Rect* b) {
@@ -75,20 +78,22 @@ static void flush(void) {
   for (int i = 0; i < buf_idx; i++) {
     mu_Rect* src = &src_buf[i];
     mu_Rect* tex = &tex_buf[i];
+
     // draw
-    int ystart = mu_max(src->y, clip_rect.y);
-    int yend = mu_min(src->y+src->h, clip_rect.y+clip_rect.h);
-    int xstart = mu_max(src->x, clip_rect.x);
-    int xend = mu_min(src->x+src->w, clip_rect.x+clip_rect.w);
+    int ystart = mu_max(src->y, _framebuffer.clip_rect.y);
+    int yend = mu_min(src->y+src->h, _framebuffer.clip_rect.y + _framebuffer.clip_rect.h);
+    int xstart = mu_max(src->x, _framebuffer.clip_rect.x);
+    int xend = mu_min(src->x+src->w, _framebuffer.clip_rect.x + _framebuffer.clip_rect.w);
+
     // hacky but sufficient for us
     if (same_size(src, tex)) {
       for (int y = ystart; y < yend; y++) {
         for (int x = xstart; x < xend; x++) {
           assert(within_rect(*src, x, y));
-          assert(within_rect(clip_rect, x, y));
+          assert(within_rect(_framebuffer.clip_rect, x, y));
           // read color from texture
           byte tc = texture_color(tex, x-src->x, y-src->y);
-          fenster_pixel(&window, x, y) |= greyscale(tc);
+          pixel(&_framebuffer, x, y) |= greyscale(tc);
         }
       }
     } else {
@@ -96,11 +101,11 @@ static void flush(void) {
       for (int y = ystart; y < yend; y++) {
         for (int x = xstart; x < xend; x++) {
           assert(within_rect(*src, x, y));
-          assert(within_rect(clip_rect, x, y));
+            assert(within_rect(_framebuffer.clip_rect, x, y));
           // blend color from operation
-          mu_Color existing_color = mu_color_argb(fenster_pixel(&window, x, y));
+          mu_Color existing_color = mu_color_argb(pixel(&_framebuffer, x, y));
           mu_Color result = blend_pixel(existing_color, new_color);
-          fenster_pixel(&window, x, y) = r_color(result);
+          pixel(&_framebuffer, x, y) = r_color(result);
         }
       }
     }
@@ -166,78 +171,22 @@ int r_get_text_height(void) {
 
 void r_set_clip_rect(mu_Rect rect) {
   flush();
+  // todo bring rect intersection code
   int ystart = mu_max(0, rect.y);
-  int yend = mu_min(window.height, rect.y+rect.h);
+  int yend = mu_min(_framebuffer.renderbuffer.height, rect.y + rect.h);
   int xstart = mu_max(0, rect.x);
-  int xend = mu_min(window.width, rect.x+rect.w);
-  clip_rect = mu_rect(xstart, ystart, xend-xstart, yend-ystart);
+  int xend = mu_min(_framebuffer.renderbuffer.width, rect.x + rect.w);
+  _framebuffer.clip_rect = mu_rect(xstart, ystart, xend - xstart, yend - ystart);
 }
 
 void r_clear(mu_Color clr) {
   flush();
-  for (int i = 0; i < window.width * window.height; i++) {
-    window.buf[i] = r_color(clr);
+    for (int i = 0; i < _framebuffer.renderbuffer.width * _framebuffer.renderbuffer.height; i++) {
+        _framebuffer.renderbuffer.data[i] = r_color(clr);
   }
 }
 
 
 void r_present(void) {
   flush();
-  fenster_loop(&window);
-}
-
-int mouse_down = 0;
-
-int r_mouse_down(void) {
-  if (window.mouse && !mouse_down) {
-    mouse_down = 1;
-    return 1;
-  }
-  return 0;
-}
-
-int r_mouse_up(void) {
-  if (!window.mouse && mouse_down) {
-    mouse_down = 0;
-    return 1;
-  }
-  return 0;
-}
-
-int r_mouse_moved(int *mousex, int *mousey) {
-  if (window.x != *mousex || window.y != *mousey) {
-    *mousex = window.x;
-    *mousey = window.y;
-    return 1;
-  }
-  return 0;
-}
-
-int r_ctrl_pressed(void) { return window.mod & 1; }
-
-int r_shift_pressed(void) { return window.mod & 2; }
-
-int r_alt_pressed(void) { return window.mod & 4; }
-
-int r_key_down(int key) {
-  if (window.keys[key] == 1) {
-    window.keys[key]++;
-    return 1;
-  }
-  return 0;
-}
-
-int r_key_up(int key) {
-  if (window.keys[key] < 1) {
-    return 1;
-  }
-  return 0;
-}
-
-int64_t r_get_time(void) {
-  return fenster_time();
-}
-
-void r_sleep(int64_t ms) {
-  fenster_sleep(ms);
 }
