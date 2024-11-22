@@ -2,7 +2,7 @@
 #include <assert.h>
 #include <stdbool.h>
 #include "renderer.h"
-#include "atlas.inl"
+#include "atlas.h"
 
 #define BUFFER_SIZE 16384
 

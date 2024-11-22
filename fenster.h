@@ -87,27 +87,61 @@ FENSTER_API int64_t fenster_time(void);
 
 #define cls(x) ((id)objc_getClass(x))
 
+#define nstr(x) (msg1(id, cls("NSString"), "stringWithUTF8String:", const char *, x))
+#define nsel(x) (NSSelectorFromString(nstr(x)))
+
 extern id const NSDefaultRunLoopMode;
 extern id const NSApp;
+extern SEL NSSelectorFromString(id aSelectorName);
 
-static void fenster_draw_rect(id v, SEL s, CGRect r) {
-  (void)r, (void)s;
-  struct fenster *f = (struct fenster *)objc_getAssociatedObject(v, "fenster");
-  CGContextRef context =
-      msg(CGContextRef, msg(id, cls("NSGraphicsContext"), "currentContext"),
-          "graphicsPort");
-  CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
-  CGDataProviderRef provider = CGDataProviderCreateWithData(
-      NULL, f->buf, f->width * f->height * 4, NULL);
-  CGImageRef img =
-      CGImageCreate(f->width, f->height, 8, 32, f->width * 4, space,
-                    kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little,
-                    provider, NULL, false, kCGRenderingIntentDefault);
-  CGColorSpaceRelease(space);
-  CGDataProviderRelease(provider);
-  CGContextDrawImage(context, CGRectMake(0, 0, f->width, f->height), img);
-  CGImageRelease(img);
+static inline void setupMenu(void) {
+  id mainMenu = msg(id, msg(id, cls("NSMenu"), "alloc"), "init");
+  
+  // Application Menu
+  id appMenuItem = msg(id, msg(id, cls("NSMenuItem"), "alloc"), "init");
+  id appMenu = msg(id, msg(id, cls("NSMenu"), "alloc"), "init");
+  id appName = msg(id, msg(id, cls("NSProcessInfo"), "processInfo"), "processName");
+  
+  // About Item
+  id title = msg2(id, cls("NSString"), "stringWithFormat:", id, nstr("About %@"), id, appName);
+  SEL sel = nsel("orderFrontStandardAboutPanel:");
+  id aboutItem = msg3(id, msg(id, cls("NSMenuItem"), "alloc"), "initWithTitle:action:keyEquivalent:", id, title, SEL, sel, id, nstr(""));
+  
+  // Quit Item
+  title = msg2(id, cls("NSString"), "stringWithFormat:", id, nstr("Quit %@"), id, appName);
+  sel = nsel("terminate:");
+  id quitItem =  msg3(id, msg(id, cls("NSMenuItem"), "alloc"), "initWithTitle:action:keyEquivalent:", id, title, SEL, sel, id, nstr("q"));
+  
+  // setup main menu
+  msg1(void, appMenu, "addItem:", id, aboutItem);
+  msg1(void, appMenu, "addItem:", id, msg(id, cls("NSMenuItem"), "separatorItem"));
+  msg1(void, appMenu, "addItem:", id, quitItem);
+  
+  msg1(void, appMenuItem, "setSubmenu:", id, appMenu);
+  msg1(void, mainMenu, "addItem:", id, appMenuItem);
+  
+  msg1(void, NSApp, "setMainMenu:", id, mainMenu);
 }
+
+static void applicationDidFinishLaunching(id self, SEL _cmd, id note) {
+  setupMenu();
+  msg1(void, NSApp, "activateIgnoringOtherApps:", BOOL, YES);
+}
+
+static void applicationWillTerminate(id self, SEL _cmd, id note) {
+  printf("bye...\n");
+}
+
+static BOOL viewAcceptsFirstResponder(id self, SEL _cmd) {
+  return YES;
+}
+
+static void viewKeyDown(id self, SEL _cmd, id event) {
+  // prevent beeps
+}
+
+static Class winDelegateClass = NULL;
+static Class fensterViewClass = NULL;
 
 static BOOL fenster_should_close(id v, SEL s, id w) {
   (void)v, (void)s, (void)w;
@@ -115,30 +149,73 @@ static BOOL fenster_should_close(id v, SEL s, id w) {
   return YES;
 }
 
+static void fenster_draw_rect(id v, SEL s, CGRect r) {
+  (void)r, (void)s;
+  struct fenster *f = (struct fenster *)objc_getAssociatedObject(v, "fenster");
+  CGContextRef context =
+  msg(CGContextRef, msg(id, cls("NSGraphicsContext"), "currentContext"),
+    "graphicsPort");
+  CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
+  CGDataProviderRef provider = CGDataProviderCreateWithData(
+    NULL, f->buf, f->width * f->height * 4, NULL);
+  CGImageRef img =
+  CGImageCreate(f->width, f->height, 8, 32, f->width * 4, space,
+    kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Little,
+    provider, NULL, false, kCGRenderingIntentDefault);
+  CGColorSpaceRelease(space);
+  CGDataProviderRelease(provider);
+  CGContextDrawImage(context, CGRectMake(0, 0, f->width, f->height), img);
+  CGImageRelease(img);
+}
+
+static inline void initialize(void) {
+  static BOOL initialized = NO;
+  if (!initialized) {
+    msg(id, cls("NSApplication"), "sharedApplication");
+    msg1(void, NSApp, "setActivationPolicy:", NSInteger, 0); // NSApplicationActivationPolicyRegular
+    
+    Class appdelegate = objc_allocateClassPair((Class)cls("NSObject"), "AppDelegate", 0);
+    class_addMethod(appdelegate, sel_getUid("applicationDidFinishLaunching:"), (IMP)applicationDidFinishLaunching, "v@:@");
+    class_addMethod(appdelegate, sel_getUid("applicationWillTerminate:"), (IMP)applicationWillTerminate, "v@:@");
+    objc_registerClassPair(appdelegate);
+    msg1(void, NSApp, "setDelegate:", id,
+      msg(id, msg(id, (id)appdelegate, "alloc"), "init"));
+    
+    winDelegateClass = objc_allocateClassPair((Class)cls("NSObject"), "FensterDelegate", 0);
+    class_addMethod(winDelegateClass, sel_getUid("windowShouldClose:"), (IMP)fenster_should_close, "c@:@");
+    objc_registerClassPair(winDelegateClass);
+    
+    fensterViewClass = objc_allocateClassPair((Class)cls("NSView"), "FensterView", 0);
+    class_addMethod(fensterViewClass, sel_getUid("drawRect:"), (IMP)fenster_draw_rect, "v@:@@");
+    class_addMethod(fensterViewClass, sel_getUid("acceptsFirstResponder"), (IMP)viewAcceptsFirstResponder, "c@");
+    class_addMethod(fensterViewClass, sel_getUid("keyDown:"), (IMP)viewKeyDown, "v@:@");
+    objc_registerClassPair(fensterViewClass);
+    
+    msg(void, NSApp, "finishLaunching");
+    initialized = YES;
+  }
+}
+
 FENSTER_API int fenster_open(struct fenster *f) {
-  msg(id, cls("NSApplication"), "sharedApplication");
-  msg1(void, NSApp, "setActivationPolicy:", NSInteger, 0);
+  initialize();
+  
   f->wnd = msg4(id, msg(id, cls("NSWindow"), "alloc"),
-                "initWithContentRect:styleMask:backing:defer:", CGRect,
-                CGRectMake(0, 0, f->width, f->height), NSUInteger, 3,
-                NSUInteger, 2, BOOL, NO);
-  Class windelegate =
-      objc_allocateClassPair((Class)cls("NSObject"), "FensterDelegate", 0);
-  class_addMethod(windelegate, sel_getUid("windowShouldClose:"),
-                  (IMP)fenster_should_close, "c@:@");
-  objc_registerClassPair(windelegate);
+    "initWithContentRect:styleMask:backing:defer:",
+    CGRect, CGRectMake(0, 0, f->width, f->height),
+    NSUInteger, 3, // NSWindowStyleMaskTitled | NSWindowStyleMaskClosable
+    NSUInteger, 2, // NSBackingStoreBuffered
+    BOOL, NO);
+  
   msg1(void, f->wnd, "setDelegate:", id,
-       msg(id, msg(id, (id)windelegate, "alloc"), "init"));
-  Class c = objc_allocateClassPair((Class)cls("NSView"), "FensterView", 0);
-  class_addMethod(c, sel_getUid("drawRect:"), (IMP)fenster_draw_rect, "i@:@@");
-  objc_registerClassPair(c);
-
-  id v = msg(id, msg(id, (id)c, "alloc"), "init");
-  msg1(void, f->wnd, "setContentView:", id, v);
-  objc_setAssociatedObject(v, "fenster", (id)f, OBJC_ASSOCIATION_ASSIGN);
-
-  id title = msg1(id, cls("NSString"), "stringWithUTF8String:", const char *,
-                  f->title);
+    msg(id, msg(id, (id)winDelegateClass, "alloc"), "init"));
+  
+  id view = msg(id, msg(id, (id)fensterViewClass, "alloc"), "init");
+  msg1(void, f->wnd, "setContentView:", id, view);
+  msg1(void, f->wnd, "makeFirstResponder:", id, view);
+  objc_setAssociatedObject(view, "fenster", (id)f, OBJC_ASSOCIATION_ASSIGN);
+  
+  id title = nstr(f->title);
+  
   msg1(void, f->wnd, "setTitle:", id, title);
   msg1(void, f->wnd, "makeKeyAndOrderFront:", id, nil);
   msg(void, f->wnd, "center");
@@ -155,36 +232,41 @@ static const uint8_t FENSTER_KEYCODES[128] = {65,83,68,70,72,71,90,88,67,86,0,66
 // clang-format on
 FENSTER_API int fenster_loop(struct fenster *f) {
   msg1(void, msg(id, f->wnd, "contentView"), "setNeedsDisplay:", BOOL, YES);
-  id ev = msg4(id, NSApp,
-               "nextEventMatchingMask:untilDate:inMode:dequeue:", NSUInteger,
-               NSUIntegerMax, id, NULL, id, NSDefaultRunLoopMode, BOOL, YES);
-  if (!ev)
+  id event = msg4(id, NSApp,
+    "nextEventMatchingMask:untilDate:inMode:dequeue:",
+    NSUInteger, NSUIntegerMax, // NSEventMaskAny
+    id, NULL,
+    id, NSDefaultRunLoopMode,
+    BOOL, YES);
+  if (!event) {
     return 0;
-  NSUInteger evtype = msg(NSUInteger, ev, "type");
+  }
+  
+  NSUInteger evtype = msg(NSUInteger, event, "type");
   switch (evtype) {
-  case 1: /* NSEventTypeMouseDown */
-    f->mouse |= 1;
-    break;
-  case 2: /* NSEventTypeMouseUp*/
-    f->mouse &= ~1;
-    break;
-  case 5:
-  case 6: { /* NSEventTypeMouseMoved */
-    CGPoint xy = msg(CGPoint, ev, "locationInWindow");
-    f->x = (int)xy.x;
-    f->y = (int)(f->height - xy.y);
-    return 0;
+    case 1: /* NSEventTypeMouseDown */
+      f->mouse |= 1;
+      break;
+    case 2: /* NSEventTypeMouseUp*/
+      f->mouse &= ~1;
+      break;
+    case 5: /* NSEventTypeMouseMoved */
+    case 6: { /* NSEventTypeMouseDragged */
+      CGPoint xy = msg(CGPoint, event, "locationInWindow");
+      f->x = (int)xy.x;
+      f->y = (int)(f->height - xy.y);
+      break;
+    }
+    case 10: /*NSEventTypeKeyDown*/
+    case 11: /*NSEventTypeKeyUp:*/ {
+      NSUInteger k = msg(NSUInteger, event, "keyCode");
+      f->keys[k < 127 ? FENSTER_KEYCODES[k] : 0] = evtype == 10;
+      NSUInteger mod = msg(NSUInteger, event, "modifierFlags") >> 17;
+      f->mod = (int)((mod & 0xc) | ((mod & 1) << 1) | ((mod >> 1) & 1));
+      break;
+    }
   }
-  case 10: /*NSEventTypeKeyDown*/
-  case 11: /*NSEventTypeKeyUp:*/ {
-    NSUInteger k = msg(NSUInteger, ev, "keyCode");
-    f->keys[k < 127 ? FENSTER_KEYCODES[k] : 0] = evtype == 10;
-    NSUInteger mod = msg(NSUInteger, ev, "modifierFlags") >> 17;
-    f->mod = (mod & 0xc) | ((mod & 1) << 1) | ((mod >> 1) & 1);
-    return 0;
-  }
-  }
-  msg1(void, NSApp, "sendEvent:", id, ev);
+  msg1(void, NSApp, "sendEvent:", id, event);
   return 0;
 }
 #elif defined(_WIN32)
