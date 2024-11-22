@@ -23,6 +23,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stddef.h>
+#include <stdalign.h>
 #include "microui.h"
 
 #define unused(x) ((void) (x))
@@ -425,6 +427,9 @@ void mu_input_text(mu_Context *ctx, const char *text) {
 **============================================================================*/
 
 mu_Command* mu_push_command(mu_Context *ctx, int type, int size) {
+  int alignment = alignof(max_align_t) - 1;
+  size = (size + alignment) & ~alignment;
+    
   mu_Command *cmd = (mu_Command*) (ctx->command_list.items + ctx->command_list.idx);
   expect(ctx->command_list.idx + size < MU_COMMANDLIST_SIZE);
   cmd->base.type = type;
