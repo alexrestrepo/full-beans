@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdbool.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "renderer.h"
 #include "atlas.h"
@@ -9,9 +10,13 @@
 
 typedef uint8_t byte;
 
-static mu_Rect tex_buf[BUFFER_SIZE];
-static mu_Rect src_buf[BUFFER_SIZE];
-static mu_Color color_buf[BUFFER_SIZE];
+typedef struct {
+    mu_Rect src_text;   // source texture rect in atlas. opacity.
+    mu_Rect dst_rect;   // destination on "screen"
+    mu_Color dst_color; // destination color
+} r_command;
+
+static r_command cmd_buf[BUFFER_SIZE] = {};
 static int buf_idx;
 
 typedef struct {
@@ -49,7 +54,7 @@ static inline byte texture_color(const mu_Rect* tex, int x, int y) {
   x = x + tex->x;
   assert(y < tex->h);
   y = y + tex->y;
-  return atlas_texture[y*ATLAS_WIDTH + x];
+  return atlas_texture[ y * ATLAS_WIDTH + x];
 }
 
 static inline uint32_t r_color(mu_Color clr) {
@@ -64,7 +69,6 @@ static inline int greyscale(byte c) {
   return r_color(mu_color(c, c, c, 255));
 }
 
-
 static inline mu_Color blend_pixel(mu_Color dst, mu_Color src) {
   int ia = 0xff - src.a;
   dst.r = ((src.r * src.a) + (dst.r * ia)) >> 8;
@@ -73,63 +77,69 @@ static inline mu_Color blend_pixel(mu_Color dst, mu_Color src) {
   return dst;
 }
 
+static inline mu_Color multiply_pixel(mu_Color a, mu_Color b) {
+    mu_Color final =  {
+        .r = (a.r * b.r) / 255.0f,
+        .g = (a.g * b.g) / 255.0f,
+        .b = (a.b * b.b) / 255.0f,
+        .a = (a.a * b.a) / 255.0f,
+    };
+    return final;
+}
+
 static void flush(void) {
-  // draw things based on texture, vertex, color
-  for (int i = 0; i < buf_idx; i++) {
-    mu_Rect* src = &src_buf[i];
-    mu_Rect* tex = &tex_buf[i];
+    // draw things based on texture, vertex, color
+    for (int i = 0; i < buf_idx; i++) {
+        r_command cmd = cmd_buf[i];
+        mu_Rect tex = cmd.src_text;
+        mu_Rect dst = cmd.dst_rect;
+        mu_Color dst_color = cmd.dst_color;
 
-    // draw
-    int ystart = mu_max(src->y, _framebuffer.clip_rect.y);
-    int yend = mu_min(src->y+src->h, _framebuffer.clip_rect.y + _framebuffer.clip_rect.h);
-    int xstart = mu_max(src->x, _framebuffer.clip_rect.x);
-    int xend = mu_min(src->x+src->w, _framebuffer.clip_rect.x + _framebuffer.clip_rect.w);
+        // draw
+        int ystart = mu_max(dst.y, _framebuffer.clip_rect.y);
+        int yend = mu_min(dst.y + dst.h, _framebuffer.clip_rect.y + _framebuffer.clip_rect.h);
+        int xstart = mu_max(dst.x, _framebuffer.clip_rect.x);
+        int xend = mu_min(dst.x + dst.w, _framebuffer.clip_rect.x + _framebuffer.clip_rect.w);
 
-    // hacky but sufficient for us
-    if (same_size(src, tex)) {
-      for (int y = ystart; y < yend; y++) {
-        for (int x = xstart; x < xend; x++) {
-          assert(within_rect(*src, x, y));
-          assert(within_rect(_framebuffer.clip_rect, x, y));
-          // read color from texture
-          byte tc = texture_color(tex, x-src->x, y-src->y);
-          pixel(&_framebuffer, x, y) |= greyscale(tc);
+        mu_Real u_ratio = (mu_Real) tex.w / dst.w;
+        mu_Real v_ratio = (mu_Real) tex.h / dst.h;
+        for (int y = ystart; y < yend; y++) {
+            for (int x = xstart; x < xend; x++) {
+                assert(within_rect(dst, x, y));
+                assert(within_rect(_framebuffer.clip_rect, x, y));
+
+                mu_Real u = (x - dst.x) * u_ratio;
+                mu_Real v = (y - dst.y) * v_ratio;
+
+                // texture contains opacity values only.
+                // TODO: if this is just a "solid" rect, we can bypass the texture and assume always white.
+                byte tc = texture_color(&tex, u, v);
+
+                // blend color from operation
+                mu_Color tex_color = mu_color(255, 255, 255, tc);
+                mu_Color existing_color = mu_color_argb(pixel(&_framebuffer, x, y));
+                mu_Color result = blend_pixel(existing_color, multiply_pixel(tex_color, dst_color));
+                pixel(&_framebuffer, x, y) = r_color(result);
+            }
         }
-      }
-    } else {
-      mu_Color new_color = color_buf[i];
-      for (int y = ystart; y < yend; y++) {
-        for (int x = xstart; x < xend; x++) {
-          assert(within_rect(*src, x, y));
-            assert(within_rect(_framebuffer.clip_rect, x, y));
-          // blend color from operation
-          mu_Color existing_color = mu_color_argb(pixel(&_framebuffer, x, y));
-          mu_Color result = blend_pixel(existing_color, new_color);
-          pixel(&_framebuffer, x, y) = r_color(result);
-        }
-      }
     }
-  }
-
-  buf_idx = 0;
+    buf_idx = 0;
 }
 
+static void push_quad(mu_Rect dst, mu_Rect tex, mu_Color color) {
+    if (buf_idx == BUFFER_SIZE) { flush(); }
 
-static void push_quad(mu_Rect src, mu_Rect tex, mu_Color color) {
-  if (buf_idx == BUFFER_SIZE) { flush(); }
-
-  tex_buf[buf_idx] = tex;
-  src_buf[buf_idx] = src;
-  color_buf[buf_idx] = color;
-
-  buf_idx++;
+    cmd_buf[buf_idx] = (r_command){
+        .dst_rect = dst,
+        .dst_color = color,
+        .src_text = tex
+    };
+    buf_idx++;
 }
-
 
 void r_draw_rect(mu_Rect rect, mu_Color color) {
   push_quad(rect, atlas[ATLAS_WHITE], color);
 }
-
 
 void r_draw_text(const char *text, mu_Vec2 pos, mu_Color color) {
   mu_Rect dst = { pos.x, pos.y, 0, 0 };
@@ -144,14 +154,12 @@ void r_draw_text(const char *text, mu_Vec2 pos, mu_Color color) {
   }
 }
 
-
 void r_draw_icon(int id, mu_Rect rect, mu_Color color) {
   mu_Rect src = atlas[id];
   int x = rect.x + (rect.w - src.w) / 2;
   int y = rect.y + (rect.h - src.h) / 2;
   push_quad(mu_rect(x, y, src.w, src.h), src, color);
 }
-
 
 int r_get_text_width(const char *text, int len) {
   int res = 0;
@@ -163,15 +171,13 @@ int r_get_text_width(const char *text, int len) {
   return res;
 }
 
-
 int r_get_text_height(void) {
   return 18;
 }
 
-
 void r_set_clip_rect(mu_Rect rect) {
   flush();
-  // todo bring rect intersection code
+  // TODO: we could simply store a clip stack to avoid flushes...
   int ystart = mu_max(0, rect.y);
   int yend = mu_min(_framebuffer.renderbuffer.height, rect.y + rect.h);
   int xstart = mu_max(0, rect.x);
@@ -180,12 +186,11 @@ void r_set_clip_rect(mu_Rect rect) {
 }
 
 void r_clear(mu_Color clr) {
-  flush();
+    flush(); // TODO: we don't need to flush if everything will be discarded. need to reset buffidx tho.
     for (int i = 0; i < _framebuffer.renderbuffer.width * _framebuffer.renderbuffer.height; i++) {
         _framebuffer.renderbuffer.data[i] = r_color(clr);
-  }
+    }
 }
-
 
 void r_present(void) {
   flush();

@@ -259,13 +259,14 @@ int main(int argc, char **argv) {
     int modifiers = 0;
 
     /* main loop */
-    while (true) {
-        fenster_loop(&window); // swaps buffers too
+    while (true) {        
+        fenster_loop(&window); // swaps buffers too... maybe move after present()?
 
         // mouse motion
         mu_input_mousemove(ctx, window.x, window.y);
 
         // TODO: mouse wheel
+        // TODO: respect key repeat... 
 
         // mouse up/down
         if (!mouse_pressed && window.mouse) {
