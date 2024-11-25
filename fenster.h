@@ -129,7 +129,7 @@ static void applicationDidFinishLaunching(id self, SEL _cmd, id note) {
 }
 
 static void applicationWillTerminate(id self, SEL _cmd, id note) {
-  printf("bye...\n");
+//  printf("bye...\n");
 }
 
 static BOOL viewAcceptsFirstResponder(id self, SEL _cmd) {
@@ -231,13 +231,13 @@ FENSTER_API void fenster_close(struct fenster *f) {
 static const uint8_t FENSTER_KEYCODES[128] = {65,83,68,70,72,71,90,88,67,86,0,66,81,87,69,82,89,84,49,50,51,52,54,53,61,57,55,45,56,48,93,79,85,91,73,80,10,76,74,39,75,59,92,44,47,78,77,46,9,32,96,8,0,27,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,26,2,3,127,0,5,0,4,0,20,19,18,17,0};
 // clang-format on
 FENSTER_API int fenster_loop(struct fenster *f) {
-  msg1(void, msg(id, f->wnd, "contentView"), "setNeedsDisplay:", BOOL, YES);
+  msg1(void, msg(id, f->wnd, "contentView"), "setNeedsDisplay:", BOOL, YES);  
   id event = msg4(id, NSApp,
     "nextEventMatchingMask:untilDate:inMode:dequeue:",
-    NSUInteger, NSUIntegerMax, // NSEventMaskAny
-    id, NULL,
-    id, NSDefaultRunLoopMode,
-    BOOL, YES);
+    NSUInteger, NSUIntegerMax,  // nextEventMatchingMask:NSEventMaskAny
+    id, NULL,                   // untilDate: nil
+    id, NSDefaultRunLoopMode,   // inMode: NSDefaultRunLoopMode
+    BOOL, YES);                 // dequeue: YES
   if (!event) {
     return 0;
   }
@@ -267,6 +267,7 @@ FENSTER_API int fenster_loop(struct fenster *f) {
     }
   }
   msg1(void, NSApp, "sendEvent:", id, event);
+  msg(void, NSApp, "updateWindows");
   return 0;
 }
 #elif defined(_WIN32)

@@ -198,15 +198,24 @@ static void style_window(mu_Context *ctx) {
     }
 }
 
+int64_t paint_time_ms = 0;
+int64_t frame_budget_ms = 0;
+int64_t sleep_time_ms = 0;
+
 static void stats_window(mu_Context *ctx) {
-    if (mu_begin_window_ex(ctx, "stats", mu_rect(10, 10, 150, 80), MU_OPT_NOCLOSE | MU_OPT_NORESIZE)) {
-        mu_Container *win = mu_get_current_container(ctx);
+    if (mu_begin_window_ex(ctx, "stats", mu_rect(10, 10, 150, 104), MU_OPT_NOCLOSE | MU_OPT_NORESIZE)) {
         char buf[64];
         mu_layout_row(ctx, 2, (int[]) { 54, -1 }, 0);
-        mu_label(ctx,"Position:");
-        sprintf(buf, "%d, %d", win->rect.x, win->rect.y); mu_label(ctx, buf);
-        mu_label(ctx, "Size:");
-        sprintf(buf, "%d, %d", win->rect.w, win->rect.h); mu_label(ctx, buf);
+
+        mu_label(ctx,"Time:");
+        sprintf(buf, "%lld ms", paint_time_ms); mu_label(ctx, buf);
+
+        mu_label(ctx, "Budget:");
+        sprintf(buf, "%lld ms", frame_budget_ms); mu_label(ctx, buf);
+
+        mu_label(ctx, "Sleep:");
+        sprintf(buf, "%lld ms", sleep_time_ms); mu_label(ctx, buf);
+
         mu_end_window(ctx);
     }
 }
@@ -232,7 +241,7 @@ static int text_height(mu_Font font) {
 int main(int argc, char **argv) {
     fenster_sleep(1000); // prevent stupid xcode from launching app twice.
 
-    struct fenster window = {.title = "Full-beans", .width = 800, .height = 600};
+    struct fenster window = {.title = "Full of beans: Hello World!", .width = 800, .height = 600};
     window.buf = calloc(window.width * window.height, sizeof(uint32_t));
     r_init((r_renderbuffer){.data = window.buf, .width = window.width, .height = window.height});
 
@@ -250,7 +259,9 @@ int main(int argc, char **argv) {
     int modifiers = 0;
 
     /* main loop */
-    while (fenster_loop(&window) == 0) { // swaps buffers too
+    while (true) {
+        fenster_loop(&window); // swaps buffers too
+
         // mouse motion
         mu_input_mousemove(ctx, window.x, window.y);
 
@@ -317,6 +328,13 @@ int main(int argc, char **argv) {
 
         /* render */
         r_clear(mu_color(bg[0], bg[1], bg[2], 255));
+
+//        for (int i = 0; i < 800; i++) {
+//            for (int j = 0; j < 600; j++) {
+//                fenster_pixel(&window, i, j) = rand();
+//            }
+//        }
+
         mu_Command *cmd = NULL;
         while (mu_next_command(ctx, &cmd)) {
             switch (cmd->type) {
@@ -329,11 +347,10 @@ int main(int argc, char **argv) {
         r_present();
 
         int64_t after = fenster_time();
-        int64_t paint_time_ms = after - before;
-        int64_t frame_budget_ms = 1000 / fps;
-        int64_t sleep_time_ms = frame_budget_ms - paint_time_ms;
+        paint_time_ms = after - before;
+        frame_budget_ms = 1000 / fps;
+        sleep_time_ms = frame_budget_ms - paint_time_ms;
         if (sleep_time_ms > 0) {
-            printf("sleep ms: %lld\n", sleep_time_ms);
             fenster_sleep(sleep_time_ms);
         }
     }
