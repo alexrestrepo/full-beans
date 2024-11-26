@@ -1,7 +1,6 @@
 #include <assert.h>
 #include <stdbool.h>
 #include <string.h>
-#include <stdio.h>
 
 #include "renderer.h"
 #include "atlas.h"
@@ -11,7 +10,7 @@
 typedef uint8_t byte;
 
 typedef struct {
-    mu_Rect src_text;   // source texture rect in atlas. opacity.
+    int atlas_src_id;   // source texture rect in atlas. opacity.
     mu_Rect dst_rect;   // destination on "screen"
     mu_Color dst_color; // destination color
 } r_command;
@@ -26,7 +25,7 @@ typedef struct {
 
 static r_framebuffer _framebuffer = {};
 
-#define pixel(f, x, y) ((f)->renderbuffer.data[((y) * (f)->renderbuffer.width) + (x)])
+#define r_pixel(f, x, y) ((f)->renderbuffer.data[((y) * (f)->renderbuffer.width) + (x)])
 
 void r_init(r_renderbuffer rb) {
   // init framebuffer
@@ -79,10 +78,10 @@ static inline mu_Color blend_pixel(mu_Color dst, mu_Color src) {
 
 static inline mu_Color multiply_pixel(mu_Color a, mu_Color b) {
     mu_Color final =  {
-        .r = (a.r * b.r) / 255.0f,
-        .g = (a.g * b.g) / 255.0f,
-        .b = (a.b * b.b) / 255.0f,
-        .a = (a.a * b.a) / 255.0f,
+        .r = (a.r * b.r) >> 8,
+        .g = (a.g * b.g) >> 8,
+        .b = (a.b * b.b) >> 8,
+        .a = (a.a * b.a) >> 8,
     };
     return final;
 }
@@ -91,7 +90,7 @@ static void flush(void) {
     // draw things based on texture, vertex, color
     for (int i = 0; i < buf_idx; i++) {
         r_command cmd = cmd_buf[i];
-        mu_Rect tex = cmd.src_text;
+        mu_Rect tex = atlas[cmd.atlas_src_id];
         mu_Rect dst = cmd.dst_rect;
         mu_Color dst_color = cmd.dst_color;
 
@@ -108,37 +107,39 @@ static void flush(void) {
                 assert(within_rect(dst, x, y));
                 assert(within_rect(_framebuffer.clip_rect, x, y));
 
-                mu_Real u = (x - dst.x) * u_ratio;
-                mu_Real v = (y - dst.y) * v_ratio;
+                mu_Color existing_color = mu_color_argb(r_pixel(&_framebuffer, x, y));
+                mu_Color out_color = dst_color;
 
-                // texture contains opacity values only.
-                // TODO: if this is just a "solid" rect, we can bypass the texture and assume always white.
-                byte tc = texture_color(&tex, u, v);
+                if (cmd.atlas_src_id != ATLAS_WHITE) {
+                    mu_Real u = (x - dst.x) * u_ratio;
+                    mu_Real v = (y - dst.y) * v_ratio;
 
-                // blend color from operation
-                mu_Color tex_color = mu_color(255, 255, 255, tc);
-                mu_Color existing_color = mu_color_argb(pixel(&_framebuffer, x, y));
-                mu_Color result = blend_pixel(existing_color, multiply_pixel(tex_color, dst_color));
-                pixel(&_framebuffer, x, y) = r_color(result);
+                    // texture contains opacity values only.
+                    byte tc = texture_color(&tex, u, v);
+                    out_color = multiply_pixel(mu_color(255, 255, 255, tc), out_color);
+                }
+
+                mu_Color result = blend_pixel(existing_color, out_color);
+                r_pixel(&_framebuffer, x, y) = r_color(result);
             }
         }
     }
     buf_idx = 0;
 }
 
-static void push_quad(mu_Rect dst, mu_Rect tex, mu_Color color) {
+static void push_quad(mu_Rect dst, int src_id, mu_Color color) {
     if (buf_idx == BUFFER_SIZE) { flush(); }
 
     cmd_buf[buf_idx] = (r_command){
         .dst_rect = dst,
         .dst_color = color,
-        .src_text = tex
+        .atlas_src_id = src_id,
     };
     buf_idx++;
 }
 
 void r_draw_rect(mu_Rect rect, mu_Color color) {
-  push_quad(rect, atlas[ATLAS_WHITE], color);
+  push_quad(rect, ATLAS_WHITE, color);
 }
 
 void r_draw_text(const char *text, mu_Vec2 pos, mu_Color color) {
@@ -149,7 +150,7 @@ void r_draw_text(const char *text, mu_Vec2 pos, mu_Color color) {
     mu_Rect src = atlas[ATLAS_FONT + chr];
     dst.w = src.w;
     dst.h = src.h;
-    push_quad(dst, src, color);
+    push_quad(dst, ATLAS_FONT + chr, color);
     dst.x += dst.w;
   }
 }
@@ -158,7 +159,7 @@ void r_draw_icon(int id, mu_Rect rect, mu_Color color) {
   mu_Rect src = atlas[id];
   int x = rect.x + (rect.w - src.w) / 2;
   int y = rect.y + (rect.h - src.h) / 2;
-  push_quad(mu_rect(x, y, src.w, src.h), src, color);
+  push_quad(mu_rect(x, y, src.w, src.h), id, color);
 }
 
 int r_get_text_width(const char *text, int len) {
