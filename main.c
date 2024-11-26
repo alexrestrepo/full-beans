@@ -245,7 +245,7 @@ static inline uint32_t r_color(mu_Color clr) {
     return ((uint32_t)clr.a << 24) | ((uint32_t)clr.r << 16) | ((uint32_t)clr.g << 8) | clr.b;
 }
 
-static void render(struct fenster *window) {
+static void render_bg(struct fenster *window) {
     static struct point { float x; float y; } verts[3] = {
         {0, 100},
         {-86.6, -50},
@@ -369,7 +369,7 @@ int main(int argc, char **argv) {
         /* render */
         r_clear(mu_color(bg[0], bg[1], bg[2], 255));
 
-        render(&window);
+        render_bg(&window);
 
         mu_Command *cmd = NULL;
         while (mu_next_command(ctx, &cmd)) {
