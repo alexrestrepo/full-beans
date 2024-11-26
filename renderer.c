@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdbool.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "renderer.h"
 #include "atlas.h"
@@ -40,8 +41,8 @@ static inline bool within(int c, int lo, int hi) {
 }
 
 static inline bool within_rect(mu_Rect rect, int x, int y) {
-  return within(x, rect.x, rect.x+rect.w)
-  && within(y, rect.y, rect.y+rect.h);
+  return (within(x, rect.x, rect.x + rect.w)
+          && within(y, rect.y, rect.y + rect.h));
 }
 
 static inline bool same_size(const mu_Rect* a, const mu_Rect* b) {
@@ -195,4 +196,27 @@ void r_clear(mu_Color clr) {
 
 void r_present(void) {
   flush();
+}
+
+void r_line(int x0, int y0, int x1, int y1, uint32_t c) {
+    int dx = abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+    int dy = abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+    int err = (dx > dy ? dx : -dy) / 2, e2;
+    for (;;) {
+        if (within_rect(_framebuffer.clip_rect, x0, y0)) {
+            r_pixel(&_framebuffer, x0, y0) = c;
+        }
+        if (x0 == x1 && y0 == y1) {
+            break;
+        }
+        e2 = err;
+        if (e2 > -dx) {
+            err -= dy;
+            x0 += sx;
+        }
+        if (e2 < dy) {
+            err += dx;
+            y0 += sy;
+        }
+    }
 }

@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <tgmath.h>
 
 #include "fenster.h"
 
@@ -49,8 +50,10 @@ static void test_window(mu_Context *ctx) {
             if (mu_button(ctx, "Button 3")) { write_log("Pressed button 3"); }
             if (mu_button(ctx, "Popup")) { mu_open_popup(ctx, "Test Popup"); }
             if (mu_begin_popup(ctx, "Test Popup")) {
-                mu_button(ctx, "Hello");
-                mu_button(ctx, "World");
+                if (mu_button(ctx, "Hello")) { write_log("pressed Hello"); };
+                if (mu_button(ctx, "World")) { write_log("pressed World"); };
+                if (mu_button(ctx, "Full")) { write_log("pressed Full"); };
+                if (mu_button(ctx, "Beans!")) { write_log("pressed Beans!"); };
                 mu_end_popup(ctx);
             }
         }
@@ -238,6 +241,42 @@ static int text_height(mu_Font font) {
     return r_get_text_height();
 }
 
+static inline uint32_t r_color(mu_Color clr) {
+    return ((uint32_t)clr.a << 24) | ((uint32_t)clr.r << 16) | ((uint32_t)clr.g << 8) | clr.b;
+}
+
+static void render(struct fenster *window) {
+    static struct point { float x; float y; } verts[3] = {
+        {0, 100},
+        {-86.6, -50},
+        {86.6, -50}
+    };
+
+    static mu_Color vert_colors[3] = {
+        {255, 0, 0, 255},
+        {0, 255, 0, 255},
+        {0, 0, 255, 255},
+    };
+
+    int w2 = window->width / 2;
+    int h2 = window->height / 2;
+    float theta = 3.14159f / 240.0;
+    float cost = cos(theta);
+    float sint = sin(theta);
+    for (int i = 0; i < 3; i++) {
+        float x = verts[i].x;
+        float y = verts[i].y;
+
+        verts[i].x = x * cost - y * sint;
+        verts[i].y = x * sint + y * cost;
+
+        r_line(w2, h2, w2 + verts[i].x, h2 - verts[i].y, r_color(vert_colors[i]));
+        r_draw_rect(mu_rect(w2 + verts[i].x - 5,
+                            h2 - verts[i].y - 5, 10, 10), vert_colors[i]);
+    }
+    r_draw_rect(mu_rect(w2 - 2, h2 - 2, 4, 4), mu_color(255, 255, 255, 255));
+}
+
 int main(int argc, char **argv) {
     fenster_sleep(1000); // prevent stupid xcode from launching app twice.
 
@@ -330,11 +369,7 @@ int main(int argc, char **argv) {
         /* render */
         r_clear(mu_color(bg[0], bg[1], bg[2], 255));
 
-//        for (int i = 0; i < 800; i++) {
-//            for (int j = 0; j < 600; j++) {
-//                fenster_pixel(&window, i, j) = rand();
-//            }
-//        }
+        render(&window);
 
         mu_Command *cmd = NULL;
         while (mu_next_command(ctx, &cmd)) {

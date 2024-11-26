@@ -21,5 +21,7 @@ void r_set_clip_rect(mu_Rect rect);
 void r_clear(mu_Color color);
 void r_present(void);
 
+void r_line(int x0, int y0, int x1, int y1, uint32_t c);
+
 #endif
 
