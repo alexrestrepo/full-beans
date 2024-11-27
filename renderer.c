@@ -120,7 +120,7 @@ static void flush(void) {
                     out_color = multiply_pixel(mu_color(255, 255, 255, tc), out_color);
                 }
 
-                mu_Color result = blend_pixel(existing_color, out_color);
+                mu_Color result = out_color.a < 255 ? blend_pixel(existing_color, out_color) : out_color;
                 r_pixel(&_framebuffer, x, y) = r_color(result);
             }
         }
@@ -220,3 +220,66 @@ void r_line(int x0, int y0, int x1, int y1, uint32_t c) {
         }
     }
 }
+
+void r_wu_line(int x0, int y0, int x1, int y1, uint32_t c) {
+    mu_Color line_color = mu_color_argb(c);
+
+#define r_swap(x, y) { int tmp = x; x = y; y = tmp; }
+    if (abs(y1 - y0) < abs(x1 - x0)) {
+        if (x1 < x0) {
+            r_swap(x0, x1);
+            r_swap(y0, y1);
+        }
+
+        float dx = x1 - x0;
+        float dy = y1 - y0;
+        float m = dy / dx;
+
+        for (int i = 0; i < dx; i++) {
+            float y = y0 + i * m;
+            int ix = x0 + i;
+            int iy = (int)y;
+            float dist = y - iy;
+
+            mu_Color existing_color = mu_color_argb(r_pixel(&_framebuffer, ix, iy));
+            line_color.a = 255.0 * (1.0 - dist);
+            mu_Color result = line_color.a < 255 ? blend_pixel(existing_color, line_color) : line_color;
+            r_pixel(&_framebuffer, ix, iy) = r_color(result);
+
+            existing_color = mu_color_argb(r_pixel(&_framebuffer, ix, iy + 1));
+            line_color.a = 255.0 * (dist);
+            result = line_color.a < 255 ? blend_pixel(existing_color, line_color) : line_color;
+            r_pixel(&_framebuffer, ix, iy + 1) = r_color(result);
+        }
+
+    } else {
+        if (y1 < y0) {
+            r_swap(x0, x1);
+            r_swap(y0, y1);
+        }
+
+        float dx = x1 - x0;
+        float dy = y1 - y0;
+        float m = dx / dy;
+
+        for (int i = 0; i < dy; i++) {
+            float x = x0 + i * m;
+            int ix = (int)x;
+            int iy = y0 + i;
+            float dist = x - ix;
+
+            mu_Color existing_color = mu_color_argb(r_pixel(&_framebuffer, ix, iy));
+            line_color.a = 255.0 * (1.0 - dist);
+            mu_Color result = line_color.a < 255 ? blend_pixel(existing_color, line_color) : line_color;
+            r_pixel(&_framebuffer, ix, iy) = r_color(result);
+
+            existing_color = mu_color_argb(r_pixel(&_framebuffer, ix + 1, iy));
+            line_color.a = 255.0 * (dist);
+            result = line_color.a < 255 ? blend_pixel(existing_color, line_color) : line_color;
+            r_pixel(&_framebuffer, ix + 1, iy) = r_color(result);
+        }
+    }
+#undef r_swap
+}
+
+#undef r_pixel

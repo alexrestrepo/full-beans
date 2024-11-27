@@ -206,7 +206,7 @@ int64_t frame_budget_ms = 0;
 int64_t sleep_time_ms = 0;
 
 static void stats_window(mu_Context *ctx) {
-    if (mu_begin_window_ex(ctx, "stats", mu_rect(10, 10, 150, 104), MU_OPT_NOCLOSE | MU_OPT_NORESIZE)) {
+    if (mu_begin_window_ex(ctx, "Stats", mu_rect(10, 10, 150, 104), MU_OPT_NOCLOSE | MU_OPT_NORESIZE)) {
         char buf[64];
         mu_layout_row(ctx, 2, (int[]) { 54, -1 }, 0);
 
@@ -270,11 +270,17 @@ static void render_bg(struct fenster *window) {
         verts[i].x = x * cost - y * sint;
         verts[i].y = x * sint + y * cost;
 
-        r_line(w2, h2, w2 + verts[i].x, h2 - verts[i].y, r_color(vert_colors[i]));
-        r_draw_rect(mu_rect(w2 + verts[i].x - 5,
+        r_line(w2 - 100, h2, w2 + verts[i].x - 100, h2 - verts[i].y, r_color(vert_colors[i]));
+        r_wu_line(w2 + 100, h2, w2 + verts[i].x + 100, h2 - verts[i].y, r_color(vert_colors[i]));
+
+        r_draw_rect(mu_rect(w2 + verts[i].x - 5 - 100,
+                            h2 - verts[i].y - 5, 10, 10), vert_colors[i]);
+
+        r_draw_rect(mu_rect(w2 + verts[i].x - 5 + 100,
                             h2 - verts[i].y - 5, 10, 10), vert_colors[i]);
     }
-    r_draw_rect(mu_rect(w2 - 2, h2 - 2, 4, 4), mu_color(255, 255, 255, 255));
+    r_draw_rect(mu_rect(w2 - 2 - 100, h2 - 2, 4, 4), mu_color(255, 255, 255, 255));
+    r_draw_rect(mu_rect(w2 - 2 + 100, h2 - 2, 4, 4), mu_color(255, 255, 255, 255));
 }
 
 int main(int argc, char **argv) {
