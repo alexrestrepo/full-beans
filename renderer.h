@@ -23,6 +23,7 @@ void r_present(void);
 
 void r_line(int x0, int y0, int x1, int y1, uint32_t c);
 void r_wu_line(int x0, int y0, int x1, int y1, uint32_t c);
+void r_triangle(mu_Vec2 a, mu_Color ca, mu_Vec2 b, mu_Color cb, mu_Vec2 c, mu_Color cc);
 
 #endif
 

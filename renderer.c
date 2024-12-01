@@ -282,4 +282,57 @@ void r_wu_line(int x0, int y0, int x1, int y1, uint32_t c) {
 #undef r_swap
 }
 
+// https://jtsorlinis.github.io/rendering-tutorial/
+static inline float edge_function(mu_Vec2 a, mu_Vec2 b, mu_Vec2 c) {
+    return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+}
+
+void r_triangle(mu_Vec2 a, mu_Color ca, mu_Vec2 b, mu_Color cb, mu_Vec2 c, mu_Color cc) {
+    // Calculate the edge function for the whole triangle (ABC)
+    float ABC = edge_function(a, b, c);
+
+    // Our nifty trick: Don't bother drawing the triangle if it's back facing
+    if (ABC < 0) {
+        return;
+    }
+
+    mu_Vec2 p = {0};
+
+    // Get the bounding box of the triangle
+    int minX = mu_min(a.x, mu_min(b.x, c.x));
+    int minY = mu_min(a.y, mu_min(b.y, c.y));
+    int maxX = mu_max(a.x, mu_max(b.x, c.x));
+    int maxY = mu_max(a.y, mu_max(b.y, c.y));
+
+    // Loop through all the pixels of the bounding box
+    for (p.y = minY; p.y < maxY; p.y++) {
+        for (p.x = minX; p.x < maxX; p.x++) {
+            // Calculate our edge functions
+            float ABP = edge_function(a, b, p);
+            float BCP = edge_function(b, c, p);
+            float CAP = edge_function(c, a, p);
+
+            // If all the edge functions are positive, the point is inside the triangle
+            if (ABP >= 0 && BCP >= 0 && CAP >= 0) {
+                // Normalise the edge functions by dividing by the total area to get the barycentric coordinates
+                float weightA = BCP / ABC;
+                float weightB = CAP / ABC;
+                float weightC = ABP / ABC;
+
+                // Interpolate the colours at point P
+                int r = ca.r * weightA + cb.r * weightB + cc.r * weightC;
+                int g = ca.g * weightA + cb.g * weightB + cc.g * weightC;
+                int b = ca.b * weightA + cb.b * weightB + cc.b * weightC;
+                int a = ca.a * weightA + cb.a * weightB + cc.a * weightC;
+                mu_Color cp = mu_color(r, g, b, a);
+
+                // Draw the pixel
+                mu_Color existing_color = mu_color_argb(r_pixel(&_framebuffer, p.x, p.y));
+                mu_Color result = a < 255 ? blend_pixel(existing_color, cp) : cp;
+                r_pixel(&_framebuffer, p.x, p.y) = r_color(result);
+            }
+        }
+    }
+}
+
 #undef r_pixel

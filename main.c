@@ -248,8 +248,8 @@ static inline uint32_t r_color(mu_Color clr) {
 static void render_bg(struct fenster *window) {
     static struct point { float x; float y; } verts[3] = {
         {0, 100},
+        {86.6, -50},
         {-86.6, -50},
-        {86.6, -50}
     };
 
     static mu_Color vert_colors[3] = {
@@ -263,6 +263,8 @@ static void render_bg(struct fenster *window) {
     float theta = 3.14159f / 240.0;
     float cost = cos(theta);
     float sint = sin(theta);
+    int offx = 150;
+
     for (int i = 0; i < 3; i++) {
         float x = verts[i].x;
         float y = verts[i].y;
@@ -270,17 +272,20 @@ static void render_bg(struct fenster *window) {
         verts[i].x = x * cost - y * sint;
         verts[i].y = x * sint + y * cost;
 
-        r_line(w2 - 100, h2, w2 + verts[i].x - 100, h2 - verts[i].y, r_color(vert_colors[i]));
-        r_wu_line(w2 + 100, h2, w2 + verts[i].x + 100, h2 - verts[i].y, r_color(vert_colors[i]));
+        r_line(w2 - offx, h2, w2 + verts[i].x - offx, h2 - verts[i].y, r_color(vert_colors[i]));
+        r_wu_line(w2 + offx, h2, w2 + verts[i].x + offx, h2 - verts[i].y, r_color(vert_colors[i]));
 
-        r_draw_rect(mu_rect(w2 + verts[i].x - 5 - 100,
+        r_draw_rect(mu_rect(w2 + verts[i].x - 5 - offx,
                             h2 - verts[i].y - 5, 10, 10), vert_colors[i]);
 
-        r_draw_rect(mu_rect(w2 + verts[i].x - 5 + 100,
+        r_draw_rect(mu_rect(w2 + verts[i].x - 5 + offx,
                             h2 - verts[i].y - 5, 10, 10), vert_colors[i]);
     }
-    r_draw_rect(mu_rect(w2 - 2 - 100, h2 - 2, 4, 4), mu_color(255, 255, 255, 255));
-    r_draw_rect(mu_rect(w2 - 2 + 100, h2 - 2, 4, 4), mu_color(255, 255, 255, 255));
+    r_triangle((mu_Vec2){w2 + verts[0].x, h2 - verts[0].y}, vert_colors[0],
+               (mu_Vec2){w2 + verts[1].x, h2 - verts[1].y}, vert_colors[1],
+               (mu_Vec2){w2 + verts[2].x, h2 - verts[2].y}, vert_colors[2]);
+    r_draw_rect(mu_rect(w2 - 2 - offx, h2 - 2, 4, 4), mu_color(255, 255, 255, 255));
+    r_draw_rect(mu_rect(w2 - 2 + offx, h2 - 2, 4, 4), mu_color(255, 255, 255, 255));
 }
 
 int main(int argc, char **argv) {
