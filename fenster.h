@@ -238,10 +238,11 @@ FENSTER_API int fenster_loop(struct fenster *f) {
     id, NULL,                   // untilDate: nil
     id, NSDefaultRunLoopMode,   // inMode: NSDefaultRunLoopMode
     BOOL, YES);                 // dequeue: YES
+
   if (!event) {
     return 0;
   }
-  
+
   NSUInteger evtype = msg(NSUInteger, event, "type");
   switch (evtype) {
     case 1: /* NSEventTypeMouseDown */
@@ -258,9 +259,12 @@ FENSTER_API int fenster_loop(struct fenster *f) {
       break;
     }
     case 10: /*NSEventTypeKeyDown*/
-    case 11: /*NSEventTypeKeyUp:*/ {
+    case 11: /*NSEventTypeKeyUp*/ {
       NSUInteger k = msg(NSUInteger, event, "keyCode");
       f->keys[k < 127 ? FENSTER_KEYCODES[k] : 0] = evtype == 10;
+    }
+    // fallthrough
+    case 12: /*NSEventTypeFlagsChanged*/ {
       NSUInteger mod = msg(NSUInteger, event, "modifierFlags") >> 17;
       f->mod = (int)((mod & 0xc) | ((mod & 1) << 1) | ((mod >> 1) & 1));
       break;

@@ -263,7 +263,7 @@ static void render_bg(struct fenster *window) {
     float theta = 3.14159f / 240.0;
     float cost = cos(theta);
     float sint = sin(theta);
-    int offx = 150;
+    int offx = 180;
 
     for (int i = 0; i < 3; i++) {
         float x = verts[i].x;
@@ -272,8 +272,8 @@ static void render_bg(struct fenster *window) {
         verts[i].x = x * cost - y * sint;
         verts[i].y = x * sint + y * cost;
 
-        r_line(w2 - offx, h2, w2 + verts[i].x - offx, h2 - verts[i].y, r_color(vert_colors[i]));
-        r_wu_line(w2 + offx, h2, w2 + verts[i].x + offx, h2 - verts[i].y, r_color(vert_colors[i]));
+//        r_line(w2 - offx, h2, w2 + verts[i].x - offx, h2 - verts[i].y, r_color(vert_colors[i]));
+//        r_wu_line(w2 + offx, h2, w2 + verts[i].x + offx, h2 - verts[i].y, r_color(vert_colors[i]));
 
         r_draw_rect(mu_rect(w2 + verts[i].x - 5 - offx,
                             h2 - verts[i].y - 5, 10, 10), vert_colors[i]);
@@ -284,6 +284,15 @@ static void render_bg(struct fenster *window) {
     r_triangle((mu_Vec2){w2 + verts[0].x, h2 - verts[0].y}, vert_colors[0],
                (mu_Vec2){w2 + verts[1].x, h2 - verts[1].y}, vert_colors[1],
                (mu_Vec2){w2 + verts[2].x, h2 - verts[2].y}, vert_colors[2]);
+
+    r_line(w2 + verts[0].x - offx, h2 - verts[0].y, w2 + verts[1].x - offx, h2 - verts[1].y, r_color(vert_colors[0]));
+    r_line(w2 + verts[1].x - offx, h2 - verts[1].y, w2 + verts[2].x - offx, h2 - verts[2].y, r_color(vert_colors[1]));
+    r_line(w2 + verts[2].x - offx, h2 - verts[2].y, w2 + verts[0].x - offx, h2 - verts[0].y, r_color(vert_colors[2]));
+
+    r_wu_line(w2 + verts[0].x + offx, h2 - verts[0].y, w2 + verts[1].x + offx, h2 - verts[1].y, r_color(vert_colors[0]));
+    r_wu_line(w2 + verts[1].x + offx, h2 - verts[1].y, w2 + verts[2].x + offx, h2 - verts[2].y, r_color(vert_colors[1]));
+    r_wu_line(w2 + verts[2].x + offx, h2 - verts[2].y, w2 + verts[0].x + offx, h2 - verts[0].y, r_color(vert_colors[2]));
+
     r_draw_rect(mu_rect(w2 - 2 - offx, h2 - 2, 4, 4), mu_color(255, 255, 255, 255));
     r_draw_rect(mu_rect(w2 - 2 + offx, h2 - 2, 4, 4), mu_color(255, 255, 255, 255));
 }
@@ -304,19 +313,22 @@ int main(int argc, char **argv) {
     ctx->text_height = text_height;
 
     int fps = 60;
-    int keys[256] = {0};
     bool mouse_pressed = false;
-    int modifiers = 0;
+
+    enum key_state {
+      KEY_UP,
+      KEY_DOWN,
+      KEY_CONSUMED,
+    };
 
     /* main loop */
-    while (true) {        
-        fenster_loop(&window); // swaps buffers too... maybe move after present()?
+    while (true) {
+        fenster_loop(&window); // swaps buffers too... maybe move after present()? also is not draining queued up events?
 
         // mouse motion
         mu_input_mousemove(ctx, window.x, window.y);
 
         // TODO: mouse wheel
-        // TODO: respect key repeat... 
 
         // mouse up/down
         if (!mouse_pressed && window.mouse) {
@@ -328,49 +340,70 @@ int main(int argc, char **argv) {
         mouse_pressed = window.mouse;
 
         // text input
-        if (window.keys[0x1b]) { // esc
+        if (window.keys[0x1b] == KEY_DOWN) { // esc
             break;
         }
 
-        if (window.keys['\n'] && !keys['\n']) {
+        // characters in NSEvent to get the actual typed chars...
+        if (window.keys['\n'] == KEY_DOWN) {
             mu_input_keydown(ctx, MU_KEY_RETURN);
 
-        } else if (!window.keys['\n'] && keys['\n']) {
+        } else if (window.keys['\n'] == KEY_UP) {
             mu_input_keyup(ctx, MU_KEY_RETURN);
 
-        } else if (window.keys['\b'] && !keys['\b']) {
+        } 
+
+        if (window.keys['\b'] == KEY_DOWN) {
             mu_input_keydown(ctx, MU_KEY_BACKSPACE);
 
-        } else if (!window.keys['\b'] && keys['\b']) {
+        } else if (window.keys['\b'] == KEY_UP) {
             mu_input_keyup(ctx, MU_KEY_BACKSPACE);
+        }
 
-        } else for (int i = 0; i < 256; i++) {
-            if (window.keys[i] && !keys[i]) {
+        if (window.keys['\t'] == KEY_DOWN) {
+            mu_Container *c = mu_get_container(ctx, "Demo Window");
+            c->open = !(c->open);
+
+            c = mu_get_container(ctx, "Log Window");
+            c->open = !(c->open);
+
+            c = mu_get_container(ctx, "Style Editor");
+            c->open = !(c->open);
+
+        }
+
+        // set modifiers...
+        if (window.mod & 1) {
+            mu_input_keydown(ctx, MU_KEY_CTRL);
+
+        } else {
+            mu_input_keyup(ctx, MU_KEY_CTRL);
+
+        }
+
+        if (window.mod & 2) {
+            mu_input_keydown(ctx, MU_KEY_SHIFT);
+
+        } else {
+            mu_input_keyup(ctx, MU_KEY_SHIFT);
+
+        }
+
+        if (window.mod & 4) {
+            mu_input_keydown(ctx, MU_KEY_ALT);
+
+        } else {
+            mu_input_keyup(ctx, MU_KEY_ALT);
+        }
+
+        // this could go in fenster at the top of the event loop...
+        for (int i = 0; i < 256; i++) {
+            if (window.keys[i] == KEY_DOWN && (' ' <= i  &&  i <= '~')) {
                 char text[2] = { (window.mod & 2) ? i : tolower(i) , 0};
                 mu_input_text(ctx, text);
             }
+            window.keys[i] = KEY_CONSUMED;
         }
-        memcpy(keys, window.keys, sizeof(keys));
-
-        if ((window.mod & 1) && !(modifiers & 1)) {
-            mu_input_keydown(ctx, MU_KEY_CTRL);
-
-        } else if (!(window.mod & 1) && (modifiers & 1)) {
-            mu_input_keyup(ctx, MU_KEY_CTRL);
-
-        } else if ((window.mod & 2) && !(modifiers & 2)) {
-            mu_input_keydown(ctx, MU_KEY_SHIFT);
-
-        } else if (!(window.mod & 2) && (modifiers & 2)) {
-            mu_input_keyup(ctx, MU_KEY_SHIFT);
-
-        } else if ((window.mod & 4) && !(modifiers & 4)) {
-            mu_input_keydown(ctx, MU_KEY_ALT);
-
-        } else if (!(window.mod & 4) && (modifiers & 4)) {
-            mu_input_keyup(ctx, MU_KEY_ALT);
-        }
-        modifiers = window.mod;
 
         int64_t before = fenster_time();
 
