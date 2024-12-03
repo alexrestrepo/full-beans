@@ -206,7 +206,7 @@ int64_t frame_budget_ms = 0;
 int64_t sleep_time_ms = 0;
 
 static void stats_window(mu_Context *ctx) {
-    if (mu_begin_window_ex(ctx, "Stats", mu_rect(10, 10, 150, 104), MU_OPT_NOCLOSE | MU_OPT_NORESIZE)) {
+    if (mu_begin_window_ex(ctx, "Stats", mu_rect(10, 10, 150, 128), MU_OPT_NOCLOSE | MU_OPT_NORESIZE)) {
         char buf[64];
         mu_layout_row(ctx, 2, (int[]) { 54, -1 }, 0);
 
@@ -218,6 +218,9 @@ static void stats_window(mu_Context *ctx) {
 
         mu_label(ctx, "Sleep:");
         sprintf(buf, "%lld ms", sleep_time_ms); mu_label(ctx, buf);
+
+        mu_label(ctx, "FPS:");
+        sprintf(buf, "%d", (int)(1.0 / ((paint_time_ms > 0 ? paint_time_ms : 1) + (sleep_time_ms > 0 ? sleep_time_ms : 0)) * 1000.0)); mu_label(ctx, buf);
 
         mu_end_window(ctx);
     }
@@ -321,14 +324,22 @@ int main(int argc, char **argv) {
       KEY_CONSUMED,
     };
 
+    enum mod_keys {
+        MOD_CTRL  = 1 << 0,
+        MOD_SHIFT = 1 << 1,
+        MOD_ALT   = 1 << 2,
+        MOD_META  = 1 << 3
+    };
+
     /* main loop */
     while (true) {
         fenster_loop(&window); // swaps buffers too... maybe move after present()? also is not draining queued up events?
 
         // mouse motion
         mu_input_mousemove(ctx, window.x, window.y);
-
-        // TODO: mouse wheel
+        
+        // mouse scroll
+        mu_input_scroll(ctx, -window.sx, -window.sy);
 
         // mouse up/down
         if (!mouse_pressed && window.mouse) {
@@ -373,7 +384,7 @@ int main(int argc, char **argv) {
         }
 
         // set modifiers...
-        if (window.mod & 1) {
+        if (window.mod & MOD_CTRL) {
             mu_input_keydown(ctx, MU_KEY_CTRL);
 
         } else {
@@ -381,7 +392,7 @@ int main(int argc, char **argv) {
 
         }
 
-        if (window.mod & 2) {
+        if (window.mod & MOD_SHIFT) {
             mu_input_keydown(ctx, MU_KEY_SHIFT);
 
         } else {
@@ -389,7 +400,7 @@ int main(int argc, char **argv) {
 
         }
 
-        if (window.mod & 4) {
+        if (window.mod & MOD_ALT) {
             mu_input_keydown(ctx, MU_KEY_ALT);
 
         } else {
@@ -399,9 +410,10 @@ int main(int argc, char **argv) {
         // this could go in fenster at the top of the event loop...
         for (int i = 0; i < 256; i++) {
             if (window.keys[i] == KEY_DOWN && (' ' <= i  &&  i <= '~')) {
-                char text[2] = { (window.mod & 2) ? i : tolower(i) , 0};
+                char text[2] = { (window.mod & MOD_SHIFT) ? i : tolower(i) , 0};
                 mu_input_text(ctx, text);
             }
+            // if in the next loop there's no event, the key will show up as "consumed"
             window.keys[i] = KEY_CONSUMED;
         }
 

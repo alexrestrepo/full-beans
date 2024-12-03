@@ -51,6 +51,8 @@ struct fenster {
   int x;
   int y;
   int mouse;
+  float sx;
+  float sy;
 #if defined(__APPLE__)
   id wnd;
 #elif defined(_WIN32)
@@ -267,6 +269,13 @@ FENSTER_API int fenster_loop(struct fenster *f) {
     case 12: /*NSEventTypeFlagsChanged*/ {
       NSUInteger mod = msg(NSUInteger, event, "modifierFlags") >> 17;
       f->mod = (int)((mod & 0xc) | ((mod & 1) << 1) | ((mod >> 1) & 1));
+      break;
+    }
+    case 22: /*NSEventTypeScrollWheel*/ {
+      CGFloat dy = msg(CGFloat, event, "scrollingDeltaY");
+      CGFloat dx = msg(CGFloat, event, "scrollingDeltaX");
+      f->sy = (float)dy;
+      f->sx = (float)dx;
       break;
     }
   }
