@@ -210,17 +210,21 @@ static void stats_window(mu_Context *ctx) {
         char buf[64];
         mu_layout_row(ctx, 2, (int[]) { 54, -1 }, 0);
 
+        mu_label(ctx, "FPS:");
+        sprintf(buf, "%d", (int)(1.0 / ((paint_time_ms > 0 ? paint_time_ms : 1) + (sleep_time_ms > 0 ? sleep_time_ms : 0)) * 1000.0));
+        mu_label(ctx, buf);
+
         mu_label(ctx,"Time:");
-        sprintf(buf, "%lld ms", paint_time_ms); mu_label(ctx, buf);
+        sprintf(buf, "%lld ms / frame", paint_time_ms);
+        mu_label(ctx, buf);
 
         mu_label(ctx, "Budget:");
-        sprintf(buf, "%lld ms", frame_budget_ms); mu_label(ctx, buf);
+        sprintf(buf, "%lld ms", frame_budget_ms);
+        mu_label(ctx, buf);
 
         mu_label(ctx, "Sleep:");
-        sprintf(buf, "%lld ms", sleep_time_ms); mu_label(ctx, buf);
-
-        mu_label(ctx, "FPS:");
-        sprintf(buf, "%d", (int)(1.0 / ((paint_time_ms > 0 ? paint_time_ms : 1) + (sleep_time_ms > 0 ? sleep_time_ms : 0)) * 1000.0)); mu_label(ctx, buf);
+        sprintf(buf, "%lld ms", sleep_time_ms);
+        mu_label(ctx, buf);
 
         mu_end_window(ctx);
     }
@@ -261,6 +265,8 @@ static void render_bg(struct fenster *window) {
         {0, 0, 255, 255},
     };
 
+    static mu_Color white = {255, 255, 255, 255};
+
     int w2 = window->width / 2;
     int h2 = window->height / 2;
     float theta = 3.14159f / 240.0;
@@ -296,8 +302,16 @@ static void render_bg(struct fenster *window) {
     r_wu_line(w2 + verts[1].x + offx, h2 - verts[1].y, w2 + verts[2].x + offx, h2 - verts[2].y, r_color(vert_colors[1]));
     r_wu_line(w2 + verts[2].x + offx, h2 - verts[2].y, w2 + verts[0].x + offx, h2 - verts[0].y, r_color(vert_colors[2]));
 
-    r_draw_rect(mu_rect(w2 - 2 - offx, h2 - 2, 4, 4), mu_color(255, 255, 255, 255));
-    r_draw_rect(mu_rect(w2 - 2 + offx, h2 - 2, 4, 4), mu_color(255, 255, 255, 255));
+    r_draw_rect(mu_rect(w2 - 2 - offx, h2 - 2, 4, 4), white);
+    r_draw_rect(mu_rect(w2 - 2 + offx, h2 - 2, 4, 4), white);
+
+    static const char beanz[] = "FULL BEANZ";
+    r_draw_text(beanz,
+                (mu_Vec2){
+                  window->width - r_get_text_width(beanz, (sizeof(beanz) / sizeof(*beanz)) - 1) - 10,
+                  window->height - r_get_text_height() - 5
+                },
+                white);
 }
 
 int main(int argc, char **argv) {
