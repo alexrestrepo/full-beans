@@ -241,15 +241,17 @@ void r_wu_line(int x0, int y0, int x1, int y1, uint32_t c) {
             int iy = (int)y;
             float dist = y - iy;
 
-            mu_Color existing_color = mu_color_argb(r_pixel(&_framebuffer, ix, iy));
-            line_color.a = 255.0 * (1.0 - dist);
-            mu_Color result = line_color.a < 255 ? blend_pixel(existing_color, line_color) : line_color;
-            r_pixel(&_framebuffer, ix, iy) = r_color(result);
+            if (within_rect(_framebuffer.clip_rect, ix, iy)) {
+                mu_Color existing_color = mu_color_argb(r_pixel(&_framebuffer, ix, iy));
+                line_color.a = 255.0 * (1.0 - dist);
+                mu_Color result = line_color.a < 255 ? blend_pixel(existing_color, line_color) : line_color;
+                r_pixel(&_framebuffer, ix, iy) = r_color(result);
 
-            existing_color = mu_color_argb(r_pixel(&_framebuffer, ix, iy + 1));
-            line_color.a = 255.0 * (dist);
-            result = line_color.a < 255 ? blend_pixel(existing_color, line_color) : line_color;
-            r_pixel(&_framebuffer, ix, iy + 1) = r_color(result);
+                existing_color = mu_color_argb(r_pixel(&_framebuffer, ix, iy + 1));
+                line_color.a = 255.0 * (dist);
+                result = line_color.a < 255 ? blend_pixel(existing_color, line_color) : line_color;
+                r_pixel(&_framebuffer, ix, iy + 1) = r_color(result);
+            }
         }
 
     } else {
@@ -268,15 +270,17 @@ void r_wu_line(int x0, int y0, int x1, int y1, uint32_t c) {
             int iy = y0 + i;
             float dist = x - ix;
 
-            mu_Color existing_color = mu_color_argb(r_pixel(&_framebuffer, ix, iy));
-            line_color.a = 255.0 * (1.0 - dist);
-            mu_Color result = line_color.a < 255 ? blend_pixel(existing_color, line_color) : line_color;
-            r_pixel(&_framebuffer, ix, iy) = r_color(result);
+            if (within_rect(_framebuffer.clip_rect, ix, iy)) {
+                mu_Color existing_color = mu_color_argb(r_pixel(&_framebuffer, ix, iy));
+                line_color.a = 255.0 * (1.0 - dist);
+                mu_Color result = line_color.a < 255 ? blend_pixel(existing_color, line_color) : line_color;
+                r_pixel(&_framebuffer, ix, iy) = r_color(result);
 
-            existing_color = mu_color_argb(r_pixel(&_framebuffer, ix + 1, iy));
-            line_color.a = 255.0 * (dist);
-            result = line_color.a < 255 ? blend_pixel(existing_color, line_color) : line_color;
-            r_pixel(&_framebuffer, ix + 1, iy) = r_color(result);
+                existing_color = mu_color_argb(r_pixel(&_framebuffer, ix + 1, iy));
+                line_color.a = 255.0 * (dist);
+                result = line_color.a < 255 ? blend_pixel(existing_color, line_color) : line_color;
+                r_pixel(&_framebuffer, ix + 1, iy) = r_color(result);
+            }
         }
     }
 #undef r_swap
@@ -307,30 +311,82 @@ void r_triangle(mu_Vec2 a, mu_Color ca, mu_Vec2 b, mu_Color cb, mu_Vec2 c, mu_Co
     // Loop through all the pixels of the bounding box
     for (p.y = minY; p.y < maxY; p.y++) {
         for (p.x = minX; p.x < maxX; p.x++) {
-            // Calculate our edge functions
-            float ABP = edge_function(a, b, p);
-            float BCP = edge_function(b, c, p);
-            float CAP = edge_function(c, a, p);
+            if (within_rect(_framebuffer.clip_rect, p.x, p.y)) {
 
-            // If all the edge functions are positive, the point is inside the triangle
-            if (ABP >= 0 && BCP >= 0 && CAP >= 0) {
-                // Normalise the edge functions by dividing by the total area to get the barycentric coordinates
-                float weightA = BCP / ABC;
-                float weightB = CAP / ABC;
-                float weightC = ABP / ABC;
+                // Calculate our edge functions
+                float ABP = edge_function(a, b, p);
+                float BCP = edge_function(b, c, p);
+                float CAP = edge_function(c, a, p);
 
-                // Interpolate the colours at point P
-                int r = ca.r * weightA + cb.r * weightB + cc.r * weightC;
-                int g = ca.g * weightA + cb.g * weightB + cc.g * weightC;
-                int b = ca.b * weightA + cb.b * weightB + cc.b * weightC;
-                int a = ca.a * weightA + cb.a * weightB + cc.a * weightC;
-                mu_Color cp = mu_color(r, g, b, a);
+                // If all the edge functions are positive, the point is inside the triangle
+                if (ABP >= 0 && BCP >= 0 && CAP >= 0) {
+                    // Normalise the edge functions by dividing by the total area to get the barycentric coordinates
+                    float weightA = BCP / ABC;
+                    float weightB = CAP / ABC;
+                    float weightC = ABP / ABC;
 
-                // Draw the pixel
-                mu_Color existing_color = mu_color_argb(r_pixel(&_framebuffer, p.x, p.y));
-                mu_Color result = a < 255 ? blend_pixel(existing_color, cp) : cp;
-                r_pixel(&_framebuffer, p.x, p.y) = r_color(result);
+                    // Interpolate the colours at point P
+                    int r = ca.r * weightA + cb.r * weightB + cc.r * weightC;
+                    int g = ca.g * weightA + cb.g * weightB + cc.g * weightC;
+                    int b = ca.b * weightA + cb.b * weightB + cc.b * weightC;
+                    int a = ca.a * weightA + cb.a * weightB + cc.a * weightC;
+                    mu_Color cp = mu_color(r, g, b, a);
+
+                    // Draw the pixel
+                    mu_Color existing_color = mu_color_argb(r_pixel(&_framebuffer, p.x, p.y));
+                    mu_Color result = a < 255 ? blend_pixel(existing_color, cp) : cp;
+                    r_pixel(&_framebuffer, p.x, p.y) = r_color(result);
+                }
             }
+        }
+    }
+}
+
+void r_circle(mu_Vec2 center, int radius, mu_Color color) {
+    // NOTE(casey): Center and radius of the circle
+    int Cx = center.x;
+    int Cy = center.y;
+    int R = radius;
+
+    // NOTE(casey): Loop that draws the circle
+    {
+        int R2 = R+R;
+
+        int X = R;
+        int Y = 0;
+        int dY = -2;
+        int dX = R2 + R2 - 4;
+        int D = R2 - 1;
+
+        while(Y <= X) {
+            if (within_rect(_framebuffer.clip_rect, Cx - X, Cy - Y)) { r_pixel(&_framebuffer, Cx - X, Cy - Y) = r_color(color); }
+            if (within_rect(_framebuffer.clip_rect, Cx + X, Cy - Y)) { r_pixel(&_framebuffer, Cx + X, Cy - Y) = r_color(color); }
+            if (within_rect(_framebuffer.clip_rect, Cx - X, Cy + Y)) { r_pixel(&_framebuffer, Cx - X, Cy + Y) = r_color(color); }
+            if (within_rect(_framebuffer.clip_rect, Cx + X, Cy + Y)) { r_pixel(&_framebuffer, Cx + X, Cy + Y) = r_color(color); }
+            if (within_rect(_framebuffer.clip_rect, Cx - Y, Cy - X)) { r_pixel(&_framebuffer, Cx - Y, Cy - X) = r_color(color); }
+            if (within_rect(_framebuffer.clip_rect, Cx + Y, Cy - X)) { r_pixel(&_framebuffer, Cx + Y, Cy - X) = r_color(color); }
+            if (within_rect(_framebuffer.clip_rect, Cx - Y, Cy + X)) { r_pixel(&_framebuffer, Cx - Y, Cy + X) = r_color(color); }
+            if (within_rect(_framebuffer.clip_rect, Cx + Y, Cy + X)) { r_pixel(&_framebuffer, Cx + Y, Cy + X) = r_color(color); }
+
+            D += dY;
+            dY -= 4;
+            ++Y;
+
+#if 0
+            // NOTE(casey): Branching version
+            if(D < 0)
+            {
+                D += dX;
+                dX -= 4;
+                --X;
+            }
+#else
+            // NOTE(casey): Branchless version
+            int Mask = (D >> 31);
+            D += dX & Mask;
+            dX -= 4 & Mask;
+            X += Mask;
+#endif
         }
     }
 }

@@ -281,8 +281,8 @@ static void render_bg(struct fenster *window) {
         verts[i].x = x * cost - y * sint;
         verts[i].y = x * sint + y * cost;
 
-//        r_line(w2 - offx, h2, w2 + verts[i].x - offx, h2 - verts[i].y, r_color(vert_colors[i]));
-//        r_wu_line(w2 + offx, h2, w2 + verts[i].x + offx, h2 - verts[i].y, r_color(vert_colors[i]));
+//        r_line(window->x - offx, window->y, window->x + verts[i].x - offx, window->y - verts[i].y, r_color(vert_colors[i]));
+//        r_wu_line(window->x + offx, window->y, window->x + verts[i].x + offx, window->y - verts[i].y, r_color(vert_colors[i]));
 
         r_draw_rect(mu_rect(w2 + verts[i].x - 5 - offx,
                             h2 - verts[i].y - 5, 10, 10), vert_colors[i]);
@@ -304,7 +304,7 @@ static void render_bg(struct fenster *window) {
 
     r_draw_rect(mu_rect(w2 - 2 - offx, h2 - 2, 4, 4), white);
     r_draw_rect(mu_rect(w2 - 2 + offx, h2 - 2, 4, 4), white);
-
+    
     static const char beanz[] = "FULL BEANZ";
     r_draw_text(beanz,
                 (mu_Vec2){
@@ -312,6 +312,8 @@ static void render_bg(struct fenster *window) {
                   window->height - r_get_text_height() - 5
                 },
                 white);
+
+    r_circle((mu_Vec2){w2, h2}, 100, white);
 }
 
 int main(int argc, char **argv) {
