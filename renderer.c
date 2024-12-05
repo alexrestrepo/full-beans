@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdlib.h>
+#include <tgmath.h>
 
 #include "renderer.h"
 #include "atlas.h"
@@ -58,11 +59,26 @@ static inline byte texture_color(const mu_Rect* tex, int x, int y) {
 }
 
 static inline uint32_t r_color(mu_Color clr) {
+//    union {
+//        uint32_t value;
+//        struct {
+//            uint8_t r;
+//            uint8_t g;
+//            uint8_t b;
+//            uint8_t a;
+//        } col;
+//    }
   return ((uint32_t)clr.a << 24) | ((uint32_t)clr.r << 16) | ((uint32_t)clr.g << 8) | clr.b;
 }
 
-mu_Color mu_color_argb(uint32_t clr) {
-  return mu_color((clr >> 16) & 0xff, (clr >> 8) & 0xff, clr & 0xff, (clr >> 24) & 0xff);
+static inline mu_Color mu_color_argb(uint32_t clr) {
+    return (mu_Color) {
+        .a = (clr >> 24) & 0xff,
+        .r = (clr >> 16) & 0xff,
+        .g = (clr >> 8)  & 0xff,
+        .b = clr & 0xff,
+    };
+//  return mu_color((clr >> 16) & 0xff, (clr >> 8) & 0xff, clr & 0xff, (clr >> 24) & 0xff);
 }
 
 static inline int greyscale(byte c) {
@@ -239,9 +255,10 @@ void r_wu_line(int x0, int y0, int x1, int y1, uint32_t c) {
             float y = y0 + i * m;
             int ix = x0 + i;
             int iy = (int)y;
-            float dist = y - iy;
 
             if (within_rect(_framebuffer.clip_rect, ix, iy)) {
+                float dist = fabs(y - iy);
+
                 mu_Color existing_color = mu_color_argb(r_pixel(&_framebuffer, ix, iy));
                 line_color.a = 255.0 * (1.0 - dist);
                 mu_Color result = line_color.a < 255 ? blend_pixel(existing_color, line_color) : line_color;
@@ -268,9 +285,10 @@ void r_wu_line(int x0, int y0, int x1, int y1, uint32_t c) {
             float x = x0 + i * m;
             int ix = (int)x;
             int iy = y0 + i;
-            float dist = x - ix;
 
             if (within_rect(_framebuffer.clip_rect, ix, iy)) {
+                float dist = fabs(x - ix);
+
                 mu_Color existing_color = mu_color_argb(r_pixel(&_framebuffer, ix, iy));
                 line_color.a = 255.0 * (1.0 - dist);
                 mu_Color result = line_color.a < 255 ? blend_pixel(existing_color, line_color) : line_color;
@@ -342,6 +360,7 @@ void r_triangle(mu_Vec2 a, mu_Color ca, mu_Vec2 b, mu_Color cb, mu_Vec2 c, mu_Co
     }
 }
 
+// https://www.computerenhance.com/p/efficient-dda-circle-outlines
 void r_circle(mu_Vec2 center, int radius, mu_Color color) {
     // NOTE(casey): Center and radius of the circle
     int Cx = center.x;
@@ -350,7 +369,7 @@ void r_circle(mu_Vec2 center, int radius, mu_Color color) {
 
     // NOTE(casey): Loop that draws the circle
     {
-        int R2 = R+R;
+        int R2 = R + R;
 
         int X = R;
         int Y = 0;
@@ -374,8 +393,7 @@ void r_circle(mu_Vec2 center, int radius, mu_Color color) {
 
 #if 0
             // NOTE(casey): Branching version
-            if(D < 0)
-            {
+            if(D < 0) {
                 D += dX;
                 dX -= 4;
                 --X;
@@ -387,6 +405,18 @@ void r_circle(mu_Vec2 center, int radius, mu_Color color) {
             dX -= 4 & Mask;
             X += Mask;
 #endif
+        }
+    }
+}
+
+// filled circle
+// https://web.archive.org/web/20120422045142/https://banu.com/blog/7/drawing-circles/
+void r_fill_circle(mu_Vec2 center, int radius, mu_Color color) {
+    for (int y = -radius; y <= radius; y++) {
+        for (int x = -radius; x <= radius; x++) {
+            if ((x * x) + (y * y) <= (radius * radius) && within_rect(_framebuffer.clip_rect, center.x + x, center.y + y)) {
+                r_pixel(&_framebuffer, center.x + x, center.y + y) = r_color(color);                
+            }
         }
     }
 }

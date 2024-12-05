@@ -314,6 +314,7 @@ static void render_bg(struct fenster *window) {
                 white);
 
     r_circle((mu_Vec2){w2, h2}, 100, white);
+//    r_fill_circle((mu_Vec2){w2, h2 + 100}, 25, white);
 }
 
 int main(int argc, char **argv) {
