@@ -411,11 +411,12 @@ void r_circle(mu_Vec2 center, int radius, mu_Color color) {
 
 // filled circle
 // https://web.archive.org/web/20120422045142/https://banu.com/blog/7/drawing-circles/
+// https://yellowsplash.wordpress.com/2009/10/23/fast-antialiased-circles-and-ellipses-from-xiaolin-wus-concepts/
 void r_fill_circle(mu_Vec2 center, int radius, mu_Color color) {
     for (int y = -radius; y <= radius; y++) {
         for (int x = -radius; x <= radius; x++) {
             if ((x * x) + (y * y) <= (radius * radius) && within_rect(_framebuffer.clip_rect, center.x + x, center.y + y)) {
-                r_pixel(&_framebuffer, center.x + x, center.y + y) = r_color(color);                
+                r_pixel(&_framebuffer, center.x + x, center.y + y) = r_color(color);
             }
         }
     }

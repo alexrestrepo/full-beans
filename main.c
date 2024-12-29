@@ -294,6 +294,11 @@ static void render_bg(struct fenster *window) {
                (mu_Vec2){w2 + verts[1].x, h2 - verts[1].y}, vert_colors[1],
                (mu_Vec2){w2 + verts[2].x, h2 - verts[2].y}, vert_colors[2]);
 
+//  for (int i = 0; i < 50; i++) {
+////    r_wu_line(arc4random_uniform(window->width), arc4random_uniform(window->height), arc4random_uniform(window->width), arc4random_uniform(window->height), rand());
+//    r_circle((mu_Vec2){arc4random_uniform(window->width), arc4random_uniform(window->height)}, arc4random_uniform(320), vert_colors[i % 3]);
+//  }
+
     r_line(w2 + verts[0].x - offx, h2 - verts[0].y, w2 + verts[1].x - offx, h2 - verts[1].y, r_color(vert_colors[0]));
     r_line(w2 + verts[1].x - offx, h2 - verts[1].y, w2 + verts[2].x - offx, h2 - verts[2].y, r_color(vert_colors[1]));
     r_line(w2 + verts[2].x - offx, h2 - verts[2].y, w2 + verts[0].x - offx, h2 - verts[0].y, r_color(vert_colors[2]));
