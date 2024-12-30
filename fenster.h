@@ -105,12 +105,14 @@ static inline void setupMenu(void) {
   id appName = msg(id, msg(id, cls("NSProcessInfo"), "processInfo"), "processName");
   
   // About Item
-  id title = msg2(id, cls("NSString"), "stringWithFormat:", id, nstr("About %@"), id, appName);
+  id fmt = nstr("About %@");
+  id title = msg2(id, cls("NSString"), "stringWithFormat:", id, fmt, id, appName);
   SEL sel = nsel("orderFrontStandardAboutPanel:");
   id aboutItem = msg3(id, msg(id, cls("NSMenuItem"), "alloc"), "initWithTitle:action:keyEquivalent:", id, title, SEL, sel, id, nstr(""));
   
   // Quit Item
-  title = msg2(id, cls("NSString"), "stringWithFormat:", id, nstr("Quit %@"), id, appName);
+  fmt = nstr("Quit %@");
+  title = msg2(id, cls("NSString"), "stringWithFormat:", id, fmt, id, appName);
   sel = nsel("terminate:");
   id quitItem =  msg3(id, msg(id, cls("NSMenuItem"), "alloc"), "initWithTitle:action:keyEquivalent:", id, title, SEL, sel, id, nstr("q"));
   
