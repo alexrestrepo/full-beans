@@ -168,6 +168,7 @@ static void fenster_draw_rect(id v, SEL s, CGRect r) {
     provider, NULL, false, kCGRenderingIntentDefault);
   CGColorSpaceRelease(space);
   CGDataProviderRelease(provider);
+  CGContextSetInterpolationQuality(context, kCGInterpolationNone);
   CGContextDrawImage(context, CGRectMake(0, 0, f->width, f->height), img);
   CGImageRelease(img);
 }
