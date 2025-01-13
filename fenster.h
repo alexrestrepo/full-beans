@@ -105,14 +105,12 @@ static inline void setupMenu(void) {
   id appName = msg(id, msg(id, cls("NSProcessInfo"), "processInfo"), "processName");
   
   // About Item
-  id fmt = nstr("About %@");
-  id title = msg2(id, cls("NSString"), "stringWithFormat:", id, fmt, id, appName);
+  id title = msg1(id, nstr("About "), "stringByAppendingString:", id, appName);
   SEL sel = nsel("orderFrontStandardAboutPanel:");
   id aboutItem = msg3(id, msg(id, cls("NSMenuItem"), "alloc"), "initWithTitle:action:keyEquivalent:", id, title, SEL, sel, id, nstr(""));
   
   // Quit Item
-  fmt = nstr("Quit %@");
-  title = msg2(id, cls("NSString"), "stringWithFormat:", id, fmt, id, appName);
+  title = msg1(id, nstr("Quit "), "stringByAppendingString:", id, appName);
   sel = nsel("terminate:");
   id quitItem =  msg3(id, msg(id, cls("NSMenuItem"), "alloc"), "initWithTitle:action:keyEquivalent:", id, title, SEL, sel, id, nstr("q"));
   
@@ -223,8 +221,7 @@ FENSTER_API int fenster_open(struct fenster *f) {
   
   msg1(void, f->wnd, "setTitle:", id, title);
   msg1(void, f->wnd, "makeKeyAndOrderFront:", id, nil);
-  msg(void, f->wnd, "center");
-  msg1(void, NSApp, "activateIgnoringOtherApps:", BOOL, YES);
+  msg(void, f->wnd, "center");  
   return 0;
 }
 

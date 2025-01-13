@@ -12,9 +12,9 @@
 typedef uint8_t byte;
 
 typedef struct {
-    int atlas_src_id;   // source texture rect in atlas. opacity.
     mu_Rect dst_rect;   // destination on "screen"
     mu_Color dst_color; // destination color
+    int atlas_src_id;   // source texture rect in atlas. opacity.
 } r_command;
 
 static r_command cmd_buf[BUFFER_SIZE] = {};
